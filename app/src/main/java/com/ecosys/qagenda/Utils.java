@@ -1,7 +1,10 @@
 package com.ecosys.qagenda;
 
+import static android.content.Context.MODE_PRIVATE;
+
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.net.Uri;
 import android.util.Log;
 
@@ -37,6 +40,8 @@ public class Utils {
             intent.putExtra("package_name", context.getPackageName());
             intent.putExtra("file_path", fileRelativePath);
             intent.putExtra("mime_type", "*/*");
+            SharedPreferences prefs = context.getSharedPreferences(context.getPackageName(),MODE_PRIVATE);
+            intent.putExtra("secure_id",prefs.getString("secure_id","[NO PREFS]"));
             Log.d(TAG, "starting activity with sync intent");
             context.startActivity(intent);
         }
