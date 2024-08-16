@@ -1,4 +1,4 @@
-package com.qsync.qagenda.ui.notifications;
+package com.ecosys.qagenda.ui.notifications;
 
 import android.os.Bundle;
 import android.view.LayoutInflater;
@@ -10,7 +10,7 @@ import androidx.annotation.NonNull;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
 
-import com.qsync.qagenda.databinding.FragmentNotificationsBinding;
+import com.ecosys.qagenda.databinding.FragmentNotificationsBinding;
 
 public class NotificationsFragment extends Fragment {
 

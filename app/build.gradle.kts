@@ -3,11 +3,11 @@ plugins {
 }
 
 android {
-    namespace = "com.qsync.qagenda"
+    namespace = "com.ecosys.qagenda"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.qsync.qagenda"
+        applicationId = "com.ecosys.qagenda"
         minSdk = 24
         targetSdk = 34
         versionCode = 1

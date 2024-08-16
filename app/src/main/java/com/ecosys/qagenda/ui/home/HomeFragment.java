@@ -1,4 +1,4 @@
-package com.qsync.qagenda.ui.home;
+package com.ecosys.qagenda.ui.home;
 
 import static android.content.Context.MODE_PRIVATE;
 
@@ -34,15 +34,20 @@ import androidx.documentfile.provider.DocumentFile;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
 
-import com.qsync.qagenda.R;
-import com.qsync.qagenda.databinding.FragmentHomeBinding;
+
+import com.ecosys.qagenda.R;
+import com.ecosys.qagenda.databinding.FragmentHomeBinding;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.FileOutputStream;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -58,6 +63,7 @@ public class HomeFragment extends Fragment {
     private FragmentHomeBinding binding;
     private Uri rootUri;
     private final SimpleDateFormat dateFormat = new SimpleDateFormat("dd-MM-YYYY-HH:mm");
+    private final SimpleDateFormat icsDateFormat = new SimpleDateFormat("yyyyMMdd'T'HHmmss'Z'");
     private LinearLayout eventsContainer;
     private SharedPreferences prefs;
     private Spinner timeDeltaSpinner;
@@ -67,6 +73,9 @@ public class HomeFragment extends Fragment {
     private int selectedMonth;
     private int selectedDay;
     private int selectedYear;
+    private  Date filterDate;
+
+    private static final String AGENDA_PATH = "calendrier/agenda.ics";
 
     public View onCreateView(@NonNull LayoutInflater inflater,
                              ViewGroup container, Bundle savedInstanceState) {
@@ -79,7 +88,7 @@ public class HomeFragment extends Fragment {
         eventsContainer = binding.eventsLinearlayout;
         timeDeltaSpinner = binding.timeDeltaSpinner;
 
-        rootUri = Uri.parse("content://com.qsync.qsync.fileprovider/apps/" + HomeFragment.this.getContext().getPackageName());
+        rootUri = Uri.parse("content://com.ecosys.ecosys.fileprovider/apps/" + HomeFragment.this.getContext().getPackageName());
 
         Button add_event_button = binding.buttonAddEvent;
         add_event_button.setOnClickListener(
@@ -93,23 +102,23 @@ public class HomeFragment extends Fragment {
 
         prefs = getContext().getSharedPreferences(getContext().getPackageName(), MODE_PRIVATE);
         //prefs.edit().putBoolean("firstrun", true).apply();
-        Log.d(TAG, "PREFS :" + prefs.getBoolean("firstrun", true));
+        Log.d(TAG, "PREFS :" + prefs.getString("secure_id", "[NO_ID]"));
         if (prefs.getBoolean("firstrun", true)) {
 
             try{
                 Intent intent = new Intent(Intent.ACTION_SYNC);
-                intent.setClassName("com.qsync.qsync", "com.qsync.qsync.AppsIntentActivity");
+                intent.setClassName("com.ecosys.ecosys", "com.ecosys.ecosys.AppsIntentActivity");
                 intent.putExtra("action_flag", "[INSTALL_APP]");
                 intent.putExtra("package_name", getContext().getPackageName());
                 Log.d(TAG, "starting activity with sync intent");
                 startActivity(intent);
                 prefs.edit().putBoolean("firstrun", false).apply();
             }catch (Exception e){
-                Log.d(TAG,"An error occured while trying to tell qsync to create app task : ",e);
-                // a the end, an error here would mainly mean that qsync is not installed.
+                Log.d(TAG,"An error occured while trying to tell ecosys to create app task : ",e);
+                // a the end, an error here would mainly mean that ecosys is not installed.
                 AlertDialog.Builder builder = new AlertDialog.Builder(HomeFragment.this.getContext());
-                builder.setTitle("QSync is missing");
-                builder.setMessage("Please make sure QSync is installed on your device. You can install it from the play store.");
+                builder.setTitle("ecosys is missing");
+                builder.setMessage("Please make sure ecosys is installed on your device. You can install it from the play store.");
                 // Set up the buttons
                 builder.setPositiveButton("OK", (dialog, which) -> {
                     dialog.dismiss();
@@ -121,32 +130,34 @@ public class HomeFragment extends Fragment {
         } else {
             try {
                 Log.d(TAG, "Trying to create file");
-                checkFileCreated("agenda.ics");
+                checkFileCreated(AGENDA_PATH);
                 Log.d(TAG, "File created");
                 displayEvents();
                 Log.d(TAG, "File created and Event displayed !!!");
 
+                // Set up the time delta spinner
+                ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(getContext(),
+                        R.array.time_delta_array, android.R.layout.simple_spinner_item);
+                adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+                timeDeltaSpinner.setAdapter(adapter);
+                timeDeltaSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+                    @Override
+                    public void onItemSelected(AdapterView<?> parentView, View selectedItemView, int position, long id) {
+                        displayEvents();
+                    }
+
+                    @Override
+                    public void onNothingSelected(AdapterView<?> parentView) {
+                        // Do nothing
+                    }
+                });
+
             } catch (java.lang.SecurityException | java.lang.IllegalArgumentException e) {
-                Log.d(TAG, "Error while trying to access qsync content provider", e);
+                Log.d(TAG, "Error while trying to access ecosys content provider", e);
             }
         }
 
-        // Set up the time delta spinner
-        ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(getContext(),
-                R.array.time_delta_array, android.R.layout.simple_spinner_item);
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        timeDeltaSpinner.setAdapter(adapter);
-        timeDeltaSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            @Override
-            public void onItemSelected(AdapterView<?> parentView, View selectedItemView, int position, long id) {
-                displayEvents();
-            }
 
-            @Override
-            public void onNothingSelected(AdapterView<?> parentView) {
-                // Do nothing
-            }
-        });
 
         return root;
     }
@@ -241,30 +252,53 @@ public class HomeFragment extends Fragment {
 
     private void writeDateToIcsFile(long timeInMillis) {
         Date date = new Date(timeInMillis);
-        String formattedDate = dateFormat.format(date);
+        String formattedDate = icsDateFormat.format(date);
 
-        String icsContent = "BEGIN:VCALENDAR\n" +
-                "VERSION:2.0\n" +
-                "PRODID:-//qsync//qagenda//EN\n" +
-                "BEGIN:VEVENT\n" +
-                "UID:uid1@example.com\n" +
+        String eventContent = "BEGIN:VEVENT\n" +
+                "UID:" + timeInMillis + "@ecosys.com\n" +
                 "DTSTAMP:" + formattedDate + "\n" +
                 "DTSTART:" + formattedDate + "\n" +
                 "DTEND:" + formattedDate + "\n" +
-                "SUMMARY:"+eventSummary+"\n" +
-                "END:VEVENT\n" +
-                "END:VCALENDAR";
+                "SUMMARY:" + eventSummary + "\n" +
+                "END:VEVENT\n";
 
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 ParcelFileDescriptor parcel = getContext().getContentResolver().openFile(
-                        Uri.withAppendedPath(rootUri, "agenda.ics"),
-                        "wa",
+                    Uri.withAppendedPath(rootUri, AGENDA_PATH),
+                        "rw",
                         null
                 );
+
+
+                // initialise file content
                 FileOutputStream os = new FileOutputStream(parcel.getFileDescriptor());
-                os.write(icsContent.getBytes(StandardCharsets.UTF_8));
+                if(parcel.getStatSize() == 0){
+                    String icsContent = "BEGIN:VCALENDAR\n" +
+                            "VERSION:2.0\n" +
+                            "PRODID:-//ecosys//qagenda\n" +
+                            eventContent +
+                            "END:VCALENDAR\n";
+
+                    os.write(icsContent.getBytes(StandardCharsets.UTF_8));
+                }else{
+
+                    // skip ics footer length and start to write
+                    FileChannel fc = os.getChannel();
+                    byte[] toAppend = (eventContent+"END:VCALENDAR\n").getBytes(StandardCharsets.UTF_8);
+                    ByteBuffer bbf = ByteBuffer.allocateDirect(toAppend.length);
+                    bbf.put(toAppend);
+                    int skipheaderlen = ("END:VCALENDAR\n").getBytes(StandardCharsets.UTF_8).length;
+                    fc.position(parcel.getStatSize()-skipheaderlen);
+                    bbf.rewind();
+                    fc.write(bbf);
+                    fc.force(true);
+                    fc.close();
+
+                }
                 os.close();
+
+
                 parcel.close();
             }
         } catch (IOException e) {
@@ -272,19 +306,24 @@ public class HomeFragment extends Fragment {
         }
     }
 
-    public void checkFileCreated(String fileName) {
+
+    public void checkFileCreated(String fileRelativePath) {
+
+
         DocumentFile file = DocumentFile.fromSingleUri(
                 getContext(),
-                Uri.withAppendedPath(rootUri, fileName)
+                Uri.withAppendedPath(rootUri, fileRelativePath)
         );
 
         if (!file.exists()) {
             Intent intent = new Intent(Intent.ACTION_SYNC);
-            intent.setClassName("com.qsync.qsync", "com.qsync.qsync.AppsIntentActivity");
+            intent.setClassName("com.ecosys.ecosys", "com.ecosys.ecosys.AppsIntentActivity");
             intent.putExtra("action_flag", "[CREATE_FILE]");
             intent.putExtra("package_name", getContext().getPackageName());
-            intent.putExtra("file_name", fileName);
+            intent.putExtra("file_path", fileRelativePath);
             intent.putExtra("mime_type", "*/*");
+            Log.d(TAG,"Secure_id="+prefs.getString("secure_id","[NO PREFS]"));
+            intent.putExtra("secure_id",prefs.getString("secure_id","[NO PREFS]"));
             Log.d(TAG, "starting activity with sync intent");
             startActivity(intent);
         }
@@ -294,7 +333,7 @@ public class HomeFragment extends Fragment {
         List<Event> events = new ArrayList<>();
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             try {
-                InputStream is = getContext().getContentResolver().openInputStream(Uri.withAppendedPath(rootUri, "agenda.ics"));
+                InputStream is = getContext().getContentResolver().openInputStream(Uri.withAppendedPath(rootUri, AGENDA_PATH));
                 BufferedReader reader = new BufferedReader(new InputStreamReader(is));
                 String line;
                 Event currentEvent = null;
@@ -305,24 +344,31 @@ public class HomeFragment extends Fragment {
                     } else if (line.startsWith("DTSTART:")) {
                         if (currentEvent != null) {
                             String dateStr = line.substring("DTSTART:".length());
-                            currentEvent.setStartDate(dateFormat.parse(dateStr));
+                            currentEvent.setStartDate(icsDateFormat.parse(dateStr));
+                            Log.d(TAG,"Event start date : "+dateStr);
+
                         }
                     } else if (line.startsWith("SUMMARY:")) {
                         if (currentEvent != null) {
                             currentEvent.setSummary(line.substring("SUMMARY:".length()));
+                            Log.d(TAG,"Event summary : "+currentEvent.getSummary());
+
                         }
                     } else if (line.startsWith("END:VEVENT")) {
                         if (currentEvent != null) {
-                            events.add(currentEvent);
+
+                            if(currentEvent.startDate.before(filterDate))
+                                events.add(currentEvent);
                             currentEvent = null;
                         }
                     }
                 }
-
-            } catch (ParseException e ) {
+                reader.close();
+                is.close();
+            } catch (ParseException e) {
                 throw new RuntimeException(e);
-            }catch (FileNotFoundException e){
-                checkFileCreated("agenda.ics");
+            } catch (FileNotFoundException e) {
+                checkFileCreated(AGENDA_PATH);
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
@@ -330,10 +376,10 @@ public class HomeFragment extends Fragment {
         return events;
     }
 
+
     private void displayEvents() {
         eventsContainer.removeAllViews();
-        List<Event> events = readIcsFile();
-        Collections.sort(events);
+
 
         String selectedDelta = timeDeltaSpinner.getSelectedItem() == null ? "This week" : timeDeltaSpinner.getSelectedItem().toString();
         Calendar calendar = Calendar.getInstance();
@@ -348,7 +394,11 @@ public class HomeFragment extends Fragment {
             calendar.add(Calendar.DAY_OF_YEAR, 1);
         }
 
-        Date filterDate = calendar.getTime();
+        filterDate = calendar.getTime();
+
+        // important to call after initializing filterDate
+        List<Event> events = readIcsFile();
+        Collections.sort(events);
 
         for (Event event : events) {
             if (event.getStartDate().before(filterDate)) {

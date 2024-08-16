@@ -1,4 +1,4 @@
-package com.qsync.qagenda.ui.notifications;
+package com.ecosys.qagenda.ui.notifications;
 
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;

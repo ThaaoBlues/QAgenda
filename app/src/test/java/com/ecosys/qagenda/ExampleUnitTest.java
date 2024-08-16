@@ -1,4 +1,4 @@
-package com.qsync.qagenda;
+package com.ecosys.qagenda;
 
 import org.junit.Test;
 

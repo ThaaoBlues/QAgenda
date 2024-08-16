@@ -1,4 +1,4 @@
-package com.qsync.qagenda.ui.home;
+package com.ecosys.qagenda.ui.home;
 
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
