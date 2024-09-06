@@ -18,7 +18,19 @@ import java.io.IOException;
 public class Utils {
 
     public static void checkFileCreated(Context context, String TAG, Uri rootUri, String fileRelativePath, byte[] content) {
-        DocumentFile file = DocumentFile.fromSingleUri(context, Uri.withAppendedPath(rootUri, fileRelativePath));
+
+        Log.d(TAG,"Checking file creation : "+rootUri.toString()+"&rel="+fileRelativePath);
+        DocumentFile file = DocumentFile.fromSingleUri(context,Uri.withAppendedPath(
+                rootUri,
+                fileRelativePath
+        ));
+        /*for(String part : fileRelativePath.split("/")){
+            Log.d(TAG,part);
+            file = file.findFile(part);
+            if(file == null ){
+                break;
+            }
+        }*/
 
         // if a content is provided, setup a temporary file for the callback class to write
         // right after being given the rights
@@ -33,7 +45,9 @@ public class Utils {
                 throw new RuntimeException(e);
             }
         }
-        if (!file.exists()) {
+        //Log.d(TAG,"File existence :"+file.exists());
+        if (file == null || !file.exists()) {
+            Log.d(TAG,"Creating file : "+fileRelativePath);
             Intent intent = new Intent(Intent.ACTION_SYNC);
             intent.setClassName("com.ecosys.ecosys", "com.ecosys.ecosys.AppsIntentActivity");
             intent.putExtra("action_flag", "[CREATE_FILE]");

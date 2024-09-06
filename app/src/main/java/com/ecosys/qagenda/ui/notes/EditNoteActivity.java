@@ -39,7 +39,7 @@ public class EditNoteActivity extends AppCompatActivity {
     private static final String TAG = "EditNotesActivity";
     private SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
     private static final String NOTES_DIR_PATH = "notes";
-    private Note note = new Note(EditNoteActivity.this,rootUri);
+    private Note note;
     ;
 
     @Override
@@ -55,7 +55,7 @@ public class EditNoteActivity extends AppCompatActivity {
         String flag = intent.getStringExtra("flag");
 
         rootUri = Uri.parse("content://com.ecosys.ecosys.fileprovider/apps/" + getPackageName());
-
+        note = new Note(EditNoteActivity.this,rootUri);
         switch (flag){
             case "[CREATE_NOTE]":
                 note.setTimestamp_creation(String.valueOf(

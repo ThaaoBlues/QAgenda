@@ -3,6 +3,7 @@
     <string name="title_home">Agenda</string>
     <string name="title_dashboard">Notes</string>
     <string name="title_notifications">Settings</string>
+    <string name="add_an_event">Add an event</string>
     <string-array name="time_delta_array">
         <item>This Day</item>
         <item>This Week</item>

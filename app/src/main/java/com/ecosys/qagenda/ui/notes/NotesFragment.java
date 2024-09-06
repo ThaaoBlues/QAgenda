@@ -1,9 +1,12 @@
 package com.ecosys.qagenda.ui.notes;
 
+
 import android.content.Intent;
+import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.ParcelFileDescriptor;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -21,10 +24,14 @@ import com.ecosys.qagenda.NoteAdapter;
 import com.ecosys.qagenda.R;
 import com.ecosys.qagenda.Utils;
 import com.ecosys.qagenda.databinding.FragmentNotesBinding;
+import com.ecosys.qagenda.databinding.FragmentNotificationsBinding;
+import com.ecosys.qagenda.ui.home.HomeFragment;
+import com.ecosys.qagenda.ui.notifications.NotificationsViewModel;
 
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -39,13 +46,15 @@ public class NotesFragment extends Fragment implements NoteAdapter.OnNoteClickLi
     private String NOTES_ANNUAIRE_PATH = "notes/annuaire.txt";
 
     private static final String TAG = "NotesFragment";
+
+
     public View onCreateView(@NonNull LayoutInflater inflater,
                              ViewGroup container, Bundle savedInstanceState) {
-        NotesViewModel dashboardViewModel =
-                new ViewModelProvider(this).get(NotesViewModel.class);
 
         binding = FragmentNotesBinding.inflate(inflater, container, false);
         View root = binding.getRoot();
+
+        Log.d(TAG,"Loading notes fragment");
 
 
         rootUri = Uri.parse("content://com.ecosys.ecosys.fileprovider/apps/" + NotesFragment.this.getContext().getPackageName());
@@ -53,6 +62,11 @@ public class NotesFragment extends Fragment implements NoteAdapter.OnNoteClickLi
 
         recyclerView =binding.recyclerView;
         btnAddNote = binding.btnAddNote;
+
+
+        // blocks function is not created as it starts a new activity
+        Utils.checkFileCreated(getContext(),TAG,rootUri,NOTES_ANNUAIRE_PATH,null);
+
 
         notes = loadNotes();
 
@@ -85,6 +99,8 @@ public class NotesFragment extends Fragment implements NoteAdapter.OnNoteClickLi
     }
 
     private List<Note> loadNotes() {
+
+        Log.d(TAG,"Loading notes...");
         Uri annuaireUri = Uri.withAppendedPath(rootUri, NOTES_ANNUAIRE_PATH);
         DocumentFile annuaireFile = DocumentFile.fromSingleUri(getContext(), annuaireUri);
 

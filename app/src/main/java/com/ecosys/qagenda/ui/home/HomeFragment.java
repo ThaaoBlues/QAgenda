@@ -51,6 +51,7 @@ import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
@@ -110,7 +111,7 @@ public class HomeFragment extends Fragment {
                 intent.setClassName("com.ecosys.ecosys", "com.ecosys.ecosys.AppsIntentActivity");
                 intent.putExtra("action_flag", "[INSTALL_APP]");
                 intent.putExtra("package_name", getContext().getPackageName());
-                Log.d(TAG, "starting activity with sync intent");
+                //Log.d(TAG, "starting activity with sync intent");
                 startActivity(intent);
                 prefs.edit().putBoolean("firstrun", false).apply();
             }catch (Exception e){
@@ -129,11 +130,11 @@ public class HomeFragment extends Fragment {
 
         } else {
             try {
-                Log.d(TAG, "Trying to create file");
+                //Log.d(TAG, "Trying to create file");
                 checkFileCreated(AGENDA_PATH);
-                Log.d(TAG, "File created");
+                //Log.d(TAG, "File created");
                 displayEvents();
-                Log.d(TAG, "File created and Event displayed !!!");
+                //Log.d(TAG, "File created and Event displayed !!!");
 
                 // Set up the time delta spinner
                 ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(getContext(),
@@ -345,13 +346,13 @@ public class HomeFragment extends Fragment {
                         if (currentEvent != null) {
                             String dateStr = line.substring("DTSTART:".length());
                             currentEvent.setStartDate(icsDateFormat.parse(dateStr));
-                            Log.d(TAG,"Event start date : "+dateStr);
+                            //Log.d(TAG,"Event start date : "+dateStr);
 
                         }
                     } else if (line.startsWith("SUMMARY:")) {
                         if (currentEvent != null) {
                             currentEvent.setSummary(line.substring("SUMMARY:".length()));
-                            Log.d(TAG,"Event summary : "+currentEvent.getSummary());
+                            //Log.d(TAG,"Event summary : "+currentEvent.getSummary());
 
                         }
                     } else if (line.startsWith("END:VEVENT")) {
@@ -391,17 +392,25 @@ public class HomeFragment extends Fragment {
         } else if (selectedDelta.equals("This Year")) {
             calendar.add(Calendar.YEAR, 1);
         } else {
-            calendar.add(Calendar.DAY_OF_YEAR, 1);
+            //calendar.add(Calendar.DAY_OF_YEAR, 1);
         }
 
         filterDate = calendar.getTime();
+
+        // set comparison date to this day at 00:00 so all the events of today are displayed
+        Date this_precise_moment = Date.from(Instant.now());
+        Calendar tmp = new Calendar.Builder().setInstant(this_precise_moment).build();
+        tmp.set(Calendar.HOUR_OF_DAY, 0);
+        tmp.set(Calendar.MINUTE, 0);
+        tmp.set(Calendar.SECOND, 0);
+        tmp.set(Calendar.MILLISECOND, 0);
 
         // important to call after initializing filterDate
         List<Event> events = readIcsFile();
         Collections.sort(events);
 
         for (Event event : events) {
-            if (event.getStartDate().before(filterDate)) {
+            if (event.getStartDate().before(filterDate) && event.getStartDate().after(tmp.getTime())) {
                 CardView cardView = new CardView(getContext());
                 cardView.setCardElevation(4);
                 cardView.setRadius(8);

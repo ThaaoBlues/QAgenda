@@ -13,10 +13,12 @@ import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.text.ParseException;
@@ -75,7 +77,7 @@ public class Note {
     }
 
     public String readNote() throws IOException {
-        Uri noteUri = Uri.withAppendedPath(rootUri, NOTES_DIR_PATH + getTimestamp_creation() + ".txt");
+        Uri noteUri = Uri.withAppendedPath(rootUri, NOTES_DIR_PATH+"/" + getTimestamp_creation() + ".txt");
         ParcelFileDescriptor parcelFileDescriptor = context.getContentResolver().openFileDescriptor(noteUri, "r");
         FileInputStream fis = new FileInputStream(parcelFileDescriptor.getFileDescriptor());
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -88,53 +90,56 @@ public class Note {
 
 
     public void saveNoteToFile(byte[] content) throws IOException {
-        String notePath = NOTES_DIR_PATH + getTimestamp_creation() + ".txt";
+        String notePath = NOTES_DIR_PATH+"/" + getTimestamp_creation() + ".txt";
         Uri noteUri = Uri.withAppendedPath(rootUri, notePath);
-        DocumentFile noteFile = DocumentFile.fromSingleUri(context, noteUri);
 
 
-        // blocks function is not crated as it starts a new activity
-        Utils.checkFileCreated(context,TAG,rootUri,notePath,content);
+        // check if note is already present in the annuary or not
+        if(!isNoteAlreadyInAnnuary()){
+            // new annuaire entry, only for brand new notes.
+            StringBuilder stb = new StringBuilder();
+            stb.append(this.timestamp_creation);
+            stb.append(";");
+            stb.append(this.title);
+            stb.append(";");
+            stb.append(this.timestamp_link_event);
+            stb.append("\n");
 
-        // new annuaire entry
-        StringBuilder stb = new StringBuilder();
-        stb.append(this.timestamp_creation);
-        stb.append(";");
-        stb.append(this.title);
-        stb.append(";");
-        stb.append(this.timestamp_link_event);
-        stb.append("\n");
+            ParcelFileDescriptor annuaireParcel = context.getContentResolver().openFileDescriptor(
+                    Uri.withAppendedPath(rootUri,ANNUAIRE_PATH),
+                    "wa"
+            );
 
-
-        // blocks function is not crated as it starts a new activity
-        Utils.checkFileCreated(context,TAG,rootUri,ANNUAIRE_PATH,stb.toString().getBytes(StandardCharsets.UTF_8));
-
-
-        ParcelFileDescriptor annuaireParcel = context.getContentResolver().openFileDescriptor(
-                Uri.withAppendedPath(rootUri,ANNUAIRE_PATH),
-                "wa"
-        );
-
-        FileWriter fw = new FileWriter(
+            FileWriter fw = new FileWriter(
                     annuaireParcel.getFileDescriptor()
-        );
+            );
 
-        fw.write(stb.toString());
-        fw.close();
+            fw.write(stb.toString());
+            fw.close();
 
 
-        ParcelFileDescriptor parcel = context.getContentResolver().openFileDescriptor(noteFile.getUri(), "rw");
-        FileOutputStream fos = new FileOutputStream(parcel.getFileDescriptor());
-        fos.write(content);
-        fos.close();
+            // blocks function is not crated as it starts a new activity
+            Utils.checkFileCreated(context,TAG,rootUri,notePath,content);
+            Log.d(TAG,"Note file created");
+        }else{
+            // only note modification
+
+            OutputStream os = context.getContentResolver().openOutputStream(noteUri,"w");
+            os.write(content);
+            os.close();
+
+        }
+
+
+
+
     }
 
     public boolean deleteNote() {
         Uri annuaireUri = Uri.withAppendedPath(rootUri, ANNUAIRE_PATH);
-        DocumentFile annuaireFile = DocumentFile.fromSingleUri(context, annuaireUri);
 
         try {
-            ParcelFileDescriptor annuaireParcel = context.getContentResolver().openFileDescriptor(annuaireFile.getUri(), "rw");
+            ParcelFileDescriptor annuaireParcel = context.getContentResolver().openFileDescriptor(annuaireUri, "rw");
             BufferedReader bfr = new BufferedReader(new FileReader(annuaireParcel.getFileDescriptor()));
             StringBuilder stb = new StringBuilder();
             String line;
@@ -153,8 +158,35 @@ public class Note {
             throw new RuntimeException(e);
         }
 
-        Uri noteUri = Uri.withAppendedPath(rootUri, NOTES_DIR_PATH + getTimestamp_creation() + ".txt");
+        Uri noteUri = Uri.withAppendedPath(rootUri, NOTES_DIR_PATH+"/" + getTimestamp_creation() + ".txt");
         DocumentFile noteFile = DocumentFile.fromSingleUri(context, noteUri);
         return noteFile != null && noteFile.delete();
+    }
+
+    private boolean isNoteAlreadyInAnnuary(){
+        Uri annuaireUri = Uri.withAppendedPath(rootUri, ANNUAIRE_PATH);
+
+        ParcelFileDescriptor annuaireParcel = null;
+        boolean ret = false;
+        try {
+            annuaireParcel = context.getContentResolver().openFileDescriptor(annuaireUri, "rw");
+            BufferedReader bfr = new BufferedReader(new FileReader(annuaireParcel.getFileDescriptor()));
+
+            String line;
+            while ((line = bfr.readLine()) != null && !ret) {
+                if (line.startsWith(getTimestamp_creation())) {
+                    ret = true;
+                }
+            }
+            bfr.close();
+        } catch (FileNotFoundException e) {
+            throw new RuntimeException(e);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+        return ret;
+
+
     }
 }

@@ -9,6 +9,10 @@ import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
 import java.io.IOException;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 public class NoteAdapter extends RecyclerView.Adapter<NoteAdapter.NoteViewHolder> {
@@ -51,9 +55,32 @@ public class NoteAdapter extends RecyclerView.Adapter<NoteAdapter.NoteViewHolder
     @Override
     public void onBindViewHolder(@NonNull NoteViewHolder holder, int position) {
         final Note note = notes.get(position);
-        holder.tvNoteDate.setText(note.getTimestamp_creation());
+
+        // properly format timestamp to human readable date
+
+
+        // Convert the timestamp string to a long value
+        long timestamp = Long.parseLong(note.getTimestamp_creation());
+
+        // Convert the timestamp to a LocalDateTime
+        LocalDateTime dateTime = null;
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            dateTime = LocalDateTime.ofInstant(Instant.ofEpochMilli(timestamp), ZoneId.systemDefault());
+
+            // Define the desired date format
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss");
+
+            // Format the LocalDateTime to a readable date string
+            String readableDate = dateTime.format(formatter);
+            holder.tvNoteDate.setText(readableDate);
+        }
+
+
         try {
-            holder.tvNoteContent.setText(note.readNote());
+            String ctt = note.readNote();
+            // display only note first line
+            holder.tvNoteContent.setText(ctt.split("\n")[0]+"\n...");
+
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
